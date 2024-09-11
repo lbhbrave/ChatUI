@@ -24,7 +24,7 @@ export type ComposerProps = {
   inputType?: InputType;
   onInputTypeChange?: (inputType: InputType) => void;
   recorder?: RecorderProps;
-  onSend: (type: string, content: string) => void;
+  onSend: (type: string, content: string, triggerType: 'enter' | 'clickBtn') => void;
   onImageSend?: (file: File) => Promise<any>;
   onFocus?: (event: React.FocusEvent<HTMLTextAreaElement>) => void;
   onChange?: (value: string, event: React.ChangeEvent<Element>) => void;
@@ -33,10 +33,17 @@ export type ComposerProps = {
   onToolbarClick?: (item: ToolbarItemProps, event: React.MouseEvent) => void;
   onAccessoryToggle?: (isAccessoryOpen: boolean) => void;
   rightAction?: IconButtonProps;
+  customSendBtn?: React.ComponentType<{
+    onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+    disabled: boolean;
+  }>;
+  senBtnDisabled?: boolean;
+  isEmpty?: boolean;
 };
 
 export interface ComposerHandle {
   setText: (text: string) => void;
+  focus: () => void;
 }
 
 export const Composer = React.forwardRef<ComposerHandle, ComposerProps>((props, ref) => {
@@ -57,6 +64,8 @@ export const Composer = React.forwardRef<ComposerHandle, ComposerProps>((props, 
     onToolbarClick,
     rightAction,
     inputOptions,
+    customSendBtn: CBtn,
+    senBtnDisabled,
   } = props;
 
   const [text, setText] = useState(initialText);
@@ -109,8 +118,13 @@ export const Composer = React.forwardRef<ComposerHandle, ComposerProps>((props, 
     isMountRef.current = true;
   }, []);
 
+  const exposedFocus = useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
+
   useImperativeHandle(ref, () => ({
     setText,
+    focus: exposedFocus,
   }));
 
   const handleInputTypeChange = useCallback(() => {
@@ -156,19 +170,22 @@ export const Composer = React.forwardRef<ComposerHandle, ComposerProps>((props, 
     [onBlur],
   );
 
-  const send = useCallback(() => {
-    onSend('text', text);
-    setText('');
+  const send = useCallback(
+    (triggerBy: 'enter' | 'clickBtn') => {
+      onSend('text', text, triggerBy);
+      setText('');
 
-    if (focused.current) {
-      inputRef.current.focus();
-    }
-  }, [onSend, text]);
+      if (focused.current) {
+        inputRef.current.focus();
+      }
+    },
+    [onSend, text],
+  );
 
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (!e.shiftKey && e.keyCode === 13) {
-        send();
+        send('enter');
         e.preventDefault();
       }
     },
@@ -188,7 +205,7 @@ export const Composer = React.forwardRef<ComposerHandle, ComposerProps>((props, 
 
   const handleSendBtnClick = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
-      send();
+      send('clickBtn');
       e.preventDefault();
     },
     [send],
@@ -257,7 +274,11 @@ export const Composer = React.forwardRef<ComposerHandle, ComposerProps>((props, 
         <div className="Composer-inputWrap">
           <ComposerInput invisible={false} {...inputProps} />
         </div>
-        <SendButton onClick={handleSendBtnClick} disabled={!text} />
+        {CBtn ? (
+          <CBtn onClick={handleSendBtnClick} disabled={!text} />
+        ) : (
+          <SendButton onClick={handleSendBtnClick} disabled={!text} />
+        )}
       </div>
     );
   }
@@ -289,7 +310,12 @@ export const Composer = React.forwardRef<ComposerHandle, ComposerProps>((props, 
             aria-label={isAccessoryOpen ? '关闭工具栏' : '展开工具栏'}
           />
         )}
-        {text && <SendButton onClick={handleSendBtnClick} disabled={false} />}
+        {text &&
+          (CBtn ? (
+            <CBtn onClick={handleSendBtnClick} disabled={Boolean(senBtnDisabled)} />
+          ) : (
+            <SendButton onClick={handleSendBtnClick} disabled={Boolean(senBtnDisabled)} />
+          ))}
       </div>
       {isAccessoryOpen && (
         <AccessoryWrap onClickOutside={handleAccessoryBlur}>

@@ -125,11 +125,31 @@ export const MessageContainer = React.forwardRef<MessageContainerHandle, Message
         // 自己发的消息，强制滚动到底部
         scrollToEnd({ force: true });
       } else if (isNearBottom(wrapper, 2)) {
-        const animated = !!wrapper.scrollTop;
-        scrollToEnd({ animated, force: true });
-      } else {
+        if (lastMessage?._id === '_TYPING') {
+          const animated = !!wrapper.scrollTop;
+          scrollToEnd({ animated, force: true });
+        }
+      } else if (lastMessage?._id !== '_TYPING_') {
         setNewCount((c) => c + 1);
         setShowBackBottom(true);
+      }
+      if (lastMessage.content?.extraData?.askType === 'GEN_UI') {
+        // 生成UI时，强制滚动至底部
+        scrollToEnd({ animated: !!wrapper.scrollTop, force: true });
+      }
+    }, [lastMessage?._id, scrollToEnd]);
+
+    useEffect(() => {
+      const scroller = scrollerRef.current;
+      const wrapper = scroller && scroller.wrapperRef.current;
+
+      if (!wrapper || !lastMessage || lastMessage.position === 'pop') {
+        return;
+      }
+
+      if (lastMessage.position === 'left' && getToBottom(wrapper) < 50) {
+        const animated = !!wrapper.scrollTop;
+        scrollToEnd({ animated, force: true });
       }
     }, [lastMessage, scrollToEnd]);
 
